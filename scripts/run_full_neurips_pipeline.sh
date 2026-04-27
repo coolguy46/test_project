@@ -54,12 +54,12 @@ else
   echo "exists: ${CHBMIT_NPZ}"
 fi
 
-echo "Preprocessing Sleep-EDF"
-if [[ ! -f "${SLEEPEDF_NPZ}" ]]; then
-  python scripts/preprocess_sleepedf.py --root "${SLEEPEDF_ROOT}" --out "${SLEEPEDF_NPZ}"
-else
-  echo "exists: ${SLEEPEDF_NPZ}"
-fi
+# echo "Preprocessing Sleep-EDF"
+# if [[ ! -f "${SLEEPEDF_NPZ}" ]]; then
+#   python scripts/preprocess_sleepedf.py --root "${SLEEPEDF_ROOT}" --out "${SLEEPEDF_NPZ}"
+# else
+#   echo "exists: ${SLEEPEDF_NPZ}"
+# fi
 
 echo "Generating and running PTB-XL matrix"
 python scripts/make_experiment_matrix.py \
@@ -98,31 +98,31 @@ python scripts/make_experiment_matrix.py \
   --seeds "${SEEDS}"
 bash configs/generated/chbmit/run_chbmit_matrix.sh
 
-echo "Creating Sleep-EDF template"
-python - <<'PY'
-import json
-p = "configs/sleepedf_template.json"
-cfg = json.load(open("configs/npz_pdsi_template.json"))
-cfg["experiment_name"] = "sleepedf_inception_pdsi"
-cfg["data"]["num_channels"] = 1
-cfg["data"]["seq_len"] = 3000
-cfg["dataset"]["path"] = "data/sleepedf_epochs.npz"
-cfg["dataset"]["channels_last"] = False
-cfg["model"]["num_channels"] = 1
-cfg["model"]["num_classes"] = 5
-cfg["model"]["multilabel"] = False
-cfg["train"]["batch_size"] = 128
-json.dump(cfg, open(p, "w"), indent=2)
-PY
+# echo "Creating Sleep-EDF template"
+# python - <<'PY'
+# import json
+# p = "configs/sleepedf_template.json"
+# cfg = json.load(open("configs/npz_pdsi_template.json"))
+# cfg["experiment_name"] = "sleepedf_inception_pdsi"
+# cfg["data"]["num_channels"] = 1
+# cfg["data"]["seq_len"] = 3000
+# cfg["dataset"]["path"] = "data/sleepedf_epochs.npz"
+# cfg["dataset"]["channels_last"] = False
+# cfg["model"]["num_channels"] = 1
+# cfg["model"]["num_classes"] = 5
+# cfg["model"]["multilabel"] = False
+# cfg["train"]["batch_size"] = 128
+# json.dump(cfg, open(p, "w"), indent=2)
+# PY
 
-echo "Generating and running Sleep-EDF matrix"
-python scripts/make_experiment_matrix.py \
-  --template configs/sleepedf_template.json \
-  --out-dir configs/generated/sleepedf \
-  --prefix sleepedf \
-  --dataset-path "${SLEEPEDF_NPZ}" \
-  --seeds "${SEEDS}"
-bash configs/generated/sleepedf/run_sleepedf_matrix.sh
+# echo "Generating and running Sleep-EDF matrix"
+# python scripts/make_experiment_matrix.py \
+#   --template configs/sleepedf_template.json \
+#   --out-dir configs/generated/sleepedf \
+#   --prefix sleepedf \
+#   --dataset-path "${SLEEPEDF_NPZ}" \
+#   --seeds "${SEEDS}"
+# bash configs/generated/sleepedf/run_sleepedf_matrix.sh
 
 mkdir -p runs/comparisons
 
@@ -147,7 +147,7 @@ compare ptbxl_pdsi_vs_butterworth ptbxl_inception_pdsi ptbxl_inception_butterwor
 compare ptbxl_fcn_pdsi_vs_fcn ptbxl_fcn_pdsi ptbxl_fcn_none
 compare ptbxl_resnet_pdsi_vs_resnet ptbxl_resnet_pdsi ptbxl_resnet_none
 compare chbmit_pdsi_vs_inception chbmit_inception_pdsi chbmit_inception_none
-compare sleepedf_pdsi_vs_inception sleepedf_inception_pdsi sleepedf_inception_none
+# compare sleepedf_pdsi_vs_inception sleepedf_inception_pdsi sleepedf_inception_none
 
 echo "Profiling model variants"
 python scripts/profile_model.py --num-channels 12 --num-classes 5 --seq-len 1000 --gate none --batch-size 256 > runs/profile_ptbxl_none.json
@@ -160,7 +160,7 @@ raise SystemExit(0 if importlib.util.find_spec("aeon") else 1)
 PY
 then
   echo "Running aeon external classical baselines"
-  for dataset in ptbxl chbmit sleepedf; do
+  for dataset in ptbxl chbmit; do
     case "${dataset}" in
       ptbxl) npz="${PTBXL_NPZ}" ;;
       chbmit) npz="${CHBMIT_NPZ}" ;;
