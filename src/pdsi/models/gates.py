@@ -8,6 +8,14 @@ from torch import nn
 import torch.nn.functional as Fnn
 
 
+def _fft_resample(x: torch.Tensor, spectrum: torch.Tensor) -> torch.Tensor:
+    return torch.fft.irfft(spectrum, n=x.shape[-1], dim=-1, norm="ortho").to(dtype=x.dtype)
+
+
+def _rfft_fp32(x: torch.Tensor) -> torch.Tensor:
+    return torch.fft.rfft(x.float(), dim=-1, norm="ortho")
+
+
 class IdentityGate(nn.Module):
     """No-op gate used for matched InceptionTime baselines."""
 
@@ -75,7 +83,7 @@ class AdaptiveSpectralGate(nn.Module):
         return log_power @ band_basis.T
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        spectrum = torch.fft.rfft(x, dim=-1, norm="ortho")
+        spectrum = _rfft_fp32(x)
         magnitude = spectrum.abs()
         bins = spectrum.shape[-1]
         basis = _rbf_basis(bins, self.num_bands, spectrum.device, magnitude.dtype)
@@ -86,7 +94,7 @@ class AdaptiveSpectralGate(nn.Module):
         mask = 1.0 + self.max_delta * torch.tanh(delta)
         self._last_mask = mask
         gated = spectrum * mask.to(dtype=spectrum.dtype)
-        return torch.fft.irfft(gated, n=x.shape[-1], dim=-1, norm="ortho")
+        return _fft_resample(x, gated)
 
     def regularization_loss(self, lambda_identity: float = 0.0, lambda_tv: float = 0.0) -> torch.Tensor:
         if self._last_mask is None:
@@ -122,14 +130,14 @@ class ComplexSpectralGate(nn.Module):
         return Fnn.interpolate(param, size=bins, mode="linear", align_corners=False)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        spectrum = torch.fft.rfft(x, dim=-1, norm="ortho")
+        spectrum = _rfft_fp32(x)
         bins = spectrum.shape[-1]
         real = 1.0 + self.max_delta * torch.tanh(self._resize(self.real_delta, bins))
         imag = self.max_delta * torch.tanh(self._resize(self.imag_delta, bins))
         multiplier = torch.complex(real, imag)
         self._last_multiplier = multiplier
         gated = spectrum * multiplier
-        return torch.fft.irfft(gated, n=x.shape[-1], dim=-1, norm="ortho")
+        return _fft_resample(x, gated)
 
     def regularization_loss(self, lambda_identity: float = 0.0, lambda_tv: float = 0.0) -> torch.Tensor:
         if self._last_multiplier is None:
@@ -160,9 +168,9 @@ class FixedButterworthGate(nn.Module):
         self.register_buffer("_zero", torch.zeros(()), persistent=False)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        spectrum = torch.fft.rfft(x, dim=-1, norm="ortho")
+        spectrum = _rfft_fp32(x)
         bins = spectrum.shape[-1]
-        freqs = torch.linspace(0.0, 1.0, bins, device=x.device, dtype=x.dtype)
+        freqs = torch.linspace(0.0, 1.0, bins, device=x.device, dtype=spectrum.real.dtype)
         low_pass = 1.0 / torch.sqrt(1.0 + (freqs / self.high_cut).clamp_min(0.0) ** (2 * self.order))
         if self.low_cut > 0:
             high_pass = 1.0 / torch.sqrt(1.0 + (self.low_cut / freqs.clamp_min(1e-6)) ** (2 * self.order))
@@ -170,7 +178,7 @@ class FixedButterworthGate(nn.Module):
             high_pass = torch.ones_like(freqs)
         mask = (low_pass * high_pass)[None, None, :]
         gated = spectrum * mask.to(dtype=spectrum.dtype)
-        return torch.fft.irfft(gated, n=x.shape[-1], dim=-1, norm="ortho")
+        return _fft_resample(x, gated)
 
     def regularization_loss(self, lambda_identity: float = 0.0, lambda_tv: float = 0.0) -> torch.Tensor:
         return self._zero
