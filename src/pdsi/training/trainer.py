@@ -29,6 +29,7 @@ class TrainConfig:
     grad_clip_norm: float = 1.0
     seed: int = 0
     multilabel: bool = False
+    progress: bool = True
 
 
 def set_seed(seed: int) -> None:
@@ -111,7 +112,22 @@ def train_model(
     for epoch in range(1, cfg.epochs + 1):
         model.train()
         train_loss = 0.0
-        for x, y in train_loader:
+        iterator = train_loader
+        progress_bar = None
+        if cfg.progress:
+            try:
+                from tqdm.auto import tqdm
+
+                progress_bar = tqdm(
+                    train_loader,
+                    desc=f"epoch {epoch}/{cfg.epochs}",
+                    leave=False,
+                    dynamic_ncols=True,
+                )
+                iterator = progress_bar
+            except ModuleNotFoundError:
+                progress_bar = None
+        for x, y in iterator:
             x = x.to(device, non_blocking=True)
             y = y.to(device, non_blocking=True)
             optimizer.zero_grad(set_to_none=True)
@@ -127,6 +143,8 @@ def train_model(
             scaler.step(optimizer)
             scaler.update()
             train_loss += float(loss.detach().item()) * x.shape[0]
+            if progress_bar is not None:
+                progress_bar.set_postfix(loss=f"{float(loss.detach().item()):.4f}")
 
         scheduler.step()
         val_metrics = evaluate(model, val_loader, cfg, device)
