@@ -127,9 +127,11 @@ Primary:
 - **PTB-XL:** 21,837 clinical 12-lead ECG records from 18,885 patients, 10 seconds each, multilabel diagnostic superclass and subclass tasks.
 - **CHB-MIT:** pediatric scalp EEG seizure detection, using subject-aware splits and fixed windows around annotated seizure intervals.
 
-Optional expansion:
+Required third benchmark for main-conference submission:
 
-- **Sleep-EDF Expanded:** sleep-stage classification from EEG/EOG/EMG windows, useful because spectral bands are directly interpretable.
+- **Sleep-EDF Expanded:** sleep-stage classification from EEG/EOG/EMG windows. This is important because sleep staging has canonical spectral-band structure and gives reviewers an interpretable EEG benchmark distinct from seizure detection.
+
+Two datasets are enough for an internal feasibility report, but not ideal for a NeurIPS main submission. The final paper should use PTB-XL, CHB-MIT, and Sleep-EDF unless CHB-MIT preprocessing or labeling proves unreliable. If time allows, add one non-biomedical UEA/UCR dataset as an out-of-domain sanity check, but do not let it displace the three biomedical benchmarks.
 
 ### Baselines
 
@@ -139,6 +141,8 @@ Core matched baselines:
 - PDSI adaptive phase-preserving gate.
 - Naive complex spectral gate, same backbone.
 - Fixed Butterworth-style spectral bandpass plus same backbone.
+- FCN and ResNet1D neural time-series classifiers, implemented in the same training stack.
+- FCN+PDSI and ResNet1D+PDSI portability checks.
 
 Strong reviewer-facing baselines:
 
@@ -147,6 +151,8 @@ Strong reviewer-facing baselines:
 - TSLANet compact classification setting.
 - TimesNet compact classification setting.
 - A small PatchTST/Transformer classifier only if it fits the compute budget cleanly.
+
+For submission, the minimum acceptable baseline set is InceptionTime, FCN, ResNet1D, MiniRocket or MultiRocket, Hydra, TSLANet, PDSI, and the PDSI controlled ablations. TimesNet and PatchTST are highly recommended if runtime permits.
 
 ### Metrics
 
@@ -164,6 +170,16 @@ Strong reviewer-facing baselines:
 - Number of spectral bands `K in {4, 8, 16, 32}`.
 - Mask range `delta_max in {0.25, 0.5, 0.75}`.
 - Low-label PTB-XL supervised subsets `{10%, 25%, 100%}`.
+
+### Hyperparameter Selection
+
+A large test-set-driven sweep is not needed and would undermine the compute-constrained claim. A small validation-only sweep is needed for credibility:
+
+- `num_bands in {8, 16, 32}`
+- `max_delta in {0.25, 0.5, 0.75}`
+- `lambda_tv in {0, 1e-4}`
+
+Run this sweep on one seed using the validation set only. Freeze the selected setting before the five-seed test runs. Report the selected hyperparameters and the full sweep grid in the appendix. If reviewers ask why the sweep is small, the answer is that PDSI is meant to be a low-tuning inductive bias rather than a heavily searched architecture.
 
 ### Robustness And Sensitivity
 
@@ -208,9 +224,15 @@ flowchart TB
 | Dataset | Method | Macro-F1 | Balanced Acc. | AUROC | AUPRC | Time/epoch | Params |
 |---|---:|---:|---:|---:|---:|---:|---:|
 | PTB-XL superclass | InceptionTime | TBD | TBD | TBD | TBD | TBD | TBD |
+| PTB-XL superclass | FCN | TBD | TBD | TBD | TBD | TBD | TBD |
+| PTB-XL superclass | ResNet1D | TBD | TBD | TBD | TBD | TBD | TBD |
+| PTB-XL superclass | MiniRocket/Hydra | TBD | TBD | TBD | TBD | TBD | TBD |
+| PTB-XL superclass | TSLANet | TBD | TBD | TBD | TBD | TBD | TBD |
 | PTB-XL superclass | PDSI | TBD | TBD | TBD | TBD | TBD | TBD |
 | CHB-MIT | InceptionTime | TBD | TBD | TBD | TBD | TBD | TBD |
 | CHB-MIT | PDSI | TBD | TBD | TBD | TBD | TBD | TBD |
+| Sleep-EDF | InceptionTime | TBD | TBD | TBD | TBD | TBD | TBD |
+| Sleep-EDF | PDSI | TBD | TBD | TBD | TBD | TBD | TBD |
 
 ### Ablation Table
 

@@ -1,0 +1,43 @@
+{
+  "experiment_name": "ptbxl_sweep_b16_d0p5_tv0",
+  "seeds": [
+    0
+  ],
+  "profile_batch_size": 128,
+  "data": {
+    "num_channels": 12,
+    "seq_len": 1000
+  },
+  "dataset": {
+    "name": "npz",
+    "path": "data/ptbxl_superclass.npz",
+    "channels_last": false,
+    "low_label_fraction": 1.0
+  },
+  "model": {
+    "num_channels": 12,
+    "num_classes": 5,
+    "gate": "pdsi",
+    "depth": 4,
+    "bottleneck_channels": 32,
+    "branch_channels": 24,
+    "num_bands": 16,
+    "max_delta": 0.5,
+    "dropout": 0.1,
+    "multilabel": true,
+    "backbone": "inception"
+  },
+  "train": {
+    "epochs": 20,
+    "batch_size": 256,
+    "lr": 0.001,
+    "weight_decay": 0.0001,
+    "patience": 6,
+    "num_workers": 4,
+    "amp": true,
+    "amp_dtype": "bfloat16",
+    "lambda_identity": 0.0001,
+    "lambda_tv": 0.0,
+    "grad_clip_norm": 1.0
+  }
+}

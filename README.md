@@ -85,6 +85,8 @@ python scripts\summarize_results.py --primary runs\pdsi\summary.json --baseline 
 - [src/pdsi/training/trainer.py](src/pdsi/training/trainer.py): training/evaluation loop.
 - [scripts/run_experiment.py](scripts/run_experiment.py): experiment CLI.
 - [scripts/profile_model.py](scripts/profile_model.py): parameter/FLOP/memory estimator.
+- [scripts/make_experiment_matrix.py](scripts/make_experiment_matrix.py): creates baseline, ablation, and small sweep configs.
 - [scripts/preprocess_ptbxl.py](scripts/preprocess_ptbxl.py): optional PTB-XL converter.
 - [scripts/preprocess_chbmit.py](scripts/preprocess_chbmit.py): optional CHB-MIT converter.
+- [BASELINES.md](BASELINES.md): baseline and hyperparameter selection plan.
 - [PROPOSAL.md](PROPOSAL.md): NeurIPS-style project plan and skeptical review.

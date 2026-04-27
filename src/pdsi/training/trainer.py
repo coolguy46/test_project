@@ -98,7 +98,7 @@ def train_model(
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=max(cfg.epochs, 1))
     criterion = _loss_fn(cfg.multilabel)
     use_amp = cfg.amp and device.type == "cuda"
-    scaler = torch.cuda.amp.GradScaler(enabled=use_amp and cfg.amp_dtype == "float16")
+    scaler = torch.amp.GradScaler(device.type, enabled=use_amp and cfg.amp_dtype == "float16")
 
     best_state = copy.deepcopy(model.state_dict())
     best_val = -float("inf")

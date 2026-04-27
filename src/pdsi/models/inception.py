@@ -119,13 +119,96 @@ class ModelConfig:
     num_channels: int
     num_classes: int
     gate: str = "pdsi"
+    backbone: str = "inception"
     depth: int = 4
     bottleneck_channels: int = 32
     branch_channels: int = 24
+    hidden_channels: int = 96
     num_bands: int = 16
     max_delta: float = 0.5
     dropout: float = 0.1
     multilabel: bool = False
+
+
+class FCNBackbone(nn.Module):
+    """Compact fully convolutional TSC baseline."""
+
+    def __init__(self, in_channels: int, hidden_channels: int = 96) -> None:
+        super().__init__()
+        channels = [hidden_channels, hidden_channels * 2, hidden_channels]
+        kernels = [8, 5, 3]
+        layers = []
+        current = in_channels
+        for out_channels, kernel in zip(channels, kernels):
+            layers.extend(
+                [
+                    nn.Conv1d(current, out_channels, kernel_size=kernel, padding=kernel // 2, bias=False),
+                    nn.BatchNorm1d(out_channels),
+                    nn.GELU(),
+                ]
+            )
+            current = out_channels
+        self.net = nn.Sequential(*layers)
+        self.out_channels = current
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.net(x)
+
+
+class ResNetBlock1D(nn.Module):
+    def __init__(self, in_channels: int, out_channels: int, kernel_size: int = 7) -> None:
+        super().__init__()
+        padding = kernel_size // 2
+        self.net = nn.Sequential(
+            nn.Conv1d(in_channels, out_channels, kernel_size=kernel_size, padding=padding, bias=False),
+            nn.BatchNorm1d(out_channels),
+            nn.GELU(),
+            nn.Conv1d(out_channels, out_channels, kernel_size=kernel_size, padding=padding, bias=False),
+            nn.BatchNorm1d(out_channels),
+        )
+        self.shortcut = (
+            nn.Identity()
+            if in_channels == out_channels
+            else nn.Sequential(nn.Conv1d(in_channels, out_channels, kernel_size=1, bias=False), nn.BatchNorm1d(out_channels))
+        )
+        self.act = nn.GELU()
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.act(self.net(x) + self.shortcut(x))
+
+
+class ResNetBackbone1D(nn.Module):
+    """Small residual CNN baseline for time-series classification."""
+
+    def __init__(self, in_channels: int, hidden_channels: int = 96, depth: int = 4) -> None:
+        super().__init__()
+        blocks = []
+        current = in_channels
+        for idx in range(depth):
+            out_channels = hidden_channels * (2 if idx >= max(depth - 1, 1) else 1)
+            blocks.append(ResNetBlock1D(current, out_channels))
+            current = out_channels
+        self.net = nn.Sequential(*blocks)
+        self.out_channels = current
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.net(x)
+
+
+def build_backbone(cfg: ModelConfig) -> nn.Module:
+    name = cfg.backbone.lower()
+    if name == "inception":
+        return InceptionBackbone(
+            in_channels=cfg.num_channels,
+            depth=cfg.depth,
+            bottleneck_channels=cfg.bottleneck_channels,
+            branch_channels=cfg.branch_channels,
+        )
+    if name == "fcn":
+        return FCNBackbone(in_channels=cfg.num_channels, hidden_channels=cfg.hidden_channels)
+    if name in {"resnet", "resnet1d"}:
+        return ResNetBackbone1D(in_channels=cfg.num_channels, hidden_channels=cfg.hidden_channels, depth=cfg.depth)
+    raise ValueError(f"Unknown backbone: {cfg.backbone}")
 
 
 class PDSIClassifier(nn.Module):
@@ -138,12 +221,7 @@ class PDSIClassifier(nn.Module):
             num_bands=cfg.num_bands,
             max_delta=cfg.max_delta,
         )
-        self.backbone = InceptionBackbone(
-            in_channels=cfg.num_channels,
-            depth=cfg.depth,
-            bottleneck_channels=cfg.bottleneck_channels,
-            branch_channels=cfg.branch_channels,
-        )
+        self.backbone = build_backbone(cfg)
         self.head = nn.Sequential(
             nn.AdaptiveAvgPool1d(1),
             nn.Flatten(),
