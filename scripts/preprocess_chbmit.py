@@ -73,6 +73,35 @@ def _split_name(subject: int) -> str:
     return "train"
 
 
+def _canonical_name(name: str) -> str:
+    """Undo MNE duplicate suffixes such as T8-P8-0 for channel matching."""
+
+    match = re.match(r"^(.*)-\d+$", name)
+    return match.group(1) if match else name
+
+
+def _pick_canonical_channels(raw, desired: list[str]) -> bool:
+    selected: list[str] = []
+    rename_map: dict[str, str] = {}
+    used: set[str] = set()
+    for wanted in desired:
+        match = None
+        for channel in raw.ch_names:
+            if channel in used:
+                continue
+            if _canonical_name(channel) == wanted:
+                match = channel
+                break
+        if match is None:
+            return False
+        selected.append(match)
+        used.add(match)
+        rename_map[match] = wanted
+    raw.pick(selected)
+    raw.rename_channels(rename_map)
+    return True
+
+
 def _window_label(start_sec: float, end_sec: float, seizures: list[tuple[float, float]], min_overlap: float) -> int:
     for seizure_start, seizure_end in seizures:
         overlap = max(0.0, min(end_sec, seizure_end) - max(start_sec, seizure_start))
@@ -104,10 +133,8 @@ def main() -> None:
 
     for edf in sorted(args.root.glob("chb??/*.edf")):
         raw = mne.io.read_raw_edf(edf, preload=True, verbose=False)
-        available = [ch for ch in args.channels if ch in raw.ch_names]
-        if len(available) != len(args.channels):
+        if not _pick_canonical_channels(raw, args.channels):
             continue
-        raw.pick(available)
         raw.resample(args.target_hz, verbose=False)
         data = raw.get_data().astype(np.float32, copy=False)
         sfreq = float(raw.info["sfreq"])

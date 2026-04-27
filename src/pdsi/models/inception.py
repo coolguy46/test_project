@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 from typing import Iterable
 
 import torch
+import torch.nn.functional as F
 from torch import nn
 
 from .gates import build_gate
@@ -195,6 +197,99 @@ class ResNetBackbone1D(nn.Module):
         return self.net(x)
 
 
+class TSLANetLiteBlock(nn.Module):
+    """Small TSLANet-inspired block with spectral shrinkage and interactive conv."""
+
+    def __init__(self, channels: int, dropout: float = 0.1) -> None:
+        super().__init__()
+        self.threshold = nn.Parameter(torch.tensor(0.05))
+        self.mix = nn.Sequential(
+            nn.Conv1d(channels, channels, kernel_size=1),
+            nn.GELU(),
+            nn.Conv1d(channels, channels, kernel_size=1),
+        )
+        self.depthwise = nn.Conv1d(channels, channels, kernel_size=7, padding=3, groups=channels)
+        self.pointwise = nn.Conv1d(channels, channels, kernel_size=1)
+        self.norm = nn.BatchNorm1d(channels)
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        spectrum = torch.fft.rfft(x, dim=-1, norm="ortho")
+        magnitude = spectrum.abs()
+        shrink = torch.relu(magnitude - torch.relu(self.threshold)) / magnitude.clamp_min(1e-6)
+        spectral = torch.fft.irfft(spectrum * shrink.to(spectrum.dtype), n=x.shape[-1], dim=-1, norm="ortho")
+        conv = self.pointwise(F.gelu(self.depthwise(x)))
+        z = self.mix(spectral) * torch.sigmoid(conv)
+        return self.norm(x + self.dropout(z))
+
+
+class TSLANetLiteBackbone(nn.Module):
+    def __init__(self, in_channels: int, hidden_channels: int = 96, depth: int = 4, dropout: float = 0.1) -> None:
+        super().__init__()
+        self.stem = nn.Sequential(
+            nn.Conv1d(in_channels, hidden_channels, kernel_size=1, bias=False),
+            nn.BatchNorm1d(hidden_channels),
+            nn.GELU(),
+        )
+        self.blocks = nn.Sequential(*[TSLANetLiteBlock(hidden_channels, dropout=dropout) for _ in range(depth)])
+        self.out_channels = hidden_channels
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.blocks(self.stem(x))
+
+
+class TimesNetLiteBlock(nn.Module):
+    """Compact period-mixing block inspired by TimesNet's multi-period view."""
+
+    def __init__(self, channels: int, periods: tuple[int, ...] = (8, 16, 32), dropout: float = 0.1) -> None:
+        super().__init__()
+        self.periods = periods
+        self.convs = nn.ModuleList(
+            [
+                nn.Sequential(
+                    nn.Conv2d(channels, channels, kernel_size=(3, 3), padding=(1, 1), groups=channels),
+                    nn.GELU(),
+                    nn.Conv2d(channels, channels, kernel_size=1),
+                )
+                for _ in periods
+            ]
+        )
+        self.proj = nn.Conv1d(channels * len(periods), channels, kernel_size=1)
+        self.norm = nn.BatchNorm1d(channels)
+        self.dropout = nn.Dropout(dropout)
+
+    def _period_view(self, x: torch.Tensor, period: int) -> tuple[torch.Tensor, int]:
+        length = x.shape[-1]
+        padded = int(math.ceil(length / period) * period)
+        if padded != length:
+            x = F.pad(x, (0, padded - length))
+        return x.reshape(x.shape[0], x.shape[1], padded // period, period), length
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        pieces = []
+        for period, conv in zip(self.periods, self.convs):
+            view, length = self._period_view(x, period)
+            z = conv(view).reshape(x.shape[0], x.shape[1], -1)[..., :length]
+            pieces.append(z)
+        z = self.proj(torch.cat(pieces, dim=1))
+        return self.norm(x + self.dropout(z))
+
+
+class TimesNetLiteBackbone(nn.Module):
+    def __init__(self, in_channels: int, hidden_channels: int = 96, depth: int = 3, dropout: float = 0.1) -> None:
+        super().__init__()
+        self.stem = nn.Sequential(
+            nn.Conv1d(in_channels, hidden_channels, kernel_size=1, bias=False),
+            nn.BatchNorm1d(hidden_channels),
+            nn.GELU(),
+        )
+        self.blocks = nn.Sequential(*[TimesNetLiteBlock(hidden_channels, dropout=dropout) for _ in range(depth)])
+        self.out_channels = hidden_channels
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.blocks(self.stem(x))
+
+
 def build_backbone(cfg: ModelConfig) -> nn.Module:
     name = cfg.backbone.lower()
     if name == "inception":
@@ -208,6 +303,20 @@ def build_backbone(cfg: ModelConfig) -> nn.Module:
         return FCNBackbone(in_channels=cfg.num_channels, hidden_channels=cfg.hidden_channels)
     if name in {"resnet", "resnet1d"}:
         return ResNetBackbone1D(in_channels=cfg.num_channels, hidden_channels=cfg.hidden_channels, depth=cfg.depth)
+    if name in {"tslanet", "tslanet_lite"}:
+        return TSLANetLiteBackbone(
+            in_channels=cfg.num_channels,
+            hidden_channels=cfg.hidden_channels,
+            depth=cfg.depth,
+            dropout=cfg.dropout,
+        )
+    if name in {"timesnet", "timesnet_lite"}:
+        return TimesNetLiteBackbone(
+            in_channels=cfg.num_channels,
+            hidden_channels=cfg.hidden_channels,
+            depth=cfg.depth,
+            dropout=cfg.dropout,
+        )
     raise ValueError(f"Unknown backbone: {cfg.backbone}")
 
 

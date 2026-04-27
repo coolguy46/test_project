@@ -49,8 +49,12 @@ def main() -> None:
         ("inception", "butterworth"),
         ("fcn", "none"),
         ("resnet", "none"),
+        ("tslanet_lite", "none"),
+        ("timesnet_lite", "none"),
         ("fcn", "pdsi"),
         ("resnet", "pdsi"),
+        ("tslanet_lite", "pdsi"),
+        ("timesnet_lite", "pdsi"),
     ]:
         cfg = copy.deepcopy(base)
         cfg["model"]["backbone"] = backbone

@@ -11,7 +11,8 @@ These are implemented by `scripts/run_experiment.py` and should be run with iden
 - `inception + complex`: phase-altering spectral gate control.
 - `fcn + none`: simple fully convolutional TSC baseline.
 - `resnet + none`: residual CNN baseline.
-- `fcn + pdsi` and `resnet + pdsi`: portability checks showing the gate is not only tuned to InceptionTime.
+- `tslanet_lite + none` and `timesnet_lite + none`: in-repo lightweight neural competitors inspired by TSLANet and TimesNet mechanisms.
+- `fcn + pdsi`, `resnet + pdsi`, `tslanet_lite + pdsi`, and `timesnet_lite + pdsi`: portability checks showing the gate is not only tuned to InceptionTime.
 
 Generate configs:
 
@@ -31,12 +32,25 @@ bash configs/generated/run_ptbxl_matrix.sh
 
 ## 2. External Strong Time-Series Baselines
 
-These should be run from their official or well-maintained implementations and imported into the final table.
+MiniRocket, MultiRocket, Hydra, and MultiRocket-Hydra can be run directly on the same NPZ files with the `aeon` runner:
 
-- MiniRocket or MultiRocket.
-- Hydra.
-- TSLANet.
-- TimesNet.
+```bash
+python -m pip install ".[baselines]"
+
+python scripts/run_aeon_baseline.py --dataset data/ptbxl_superclass.npz --method minirocket --experiment-name ptbxl_minirocket --seeds 0,1,2,3,4
+python scripts/run_aeon_baseline.py --dataset data/ptbxl_superclass.npz --method multirocket --experiment-name ptbxl_multirocket --seeds 0,1,2,3,4
+python scripts/run_aeon_baseline.py --dataset data/ptbxl_superclass.npz --method hydra --experiment-name ptbxl_hydra --seeds 0,1,2,3,4
+python scripts/run_aeon_baseline.py --dataset data/ptbxl_superclass.npz --method multirocket_hydra --experiment-name ptbxl_multirocket_hydra --seeds 0,1,2,3,4
+```
+
+For official deep baselines, fetch the upstream repositories and run their classification pipelines with exact commit hashes:
+
+```bash
+bash scripts/setup_official_baselines.sh
+```
+
+- TSLANet official repository.
+- Time-Series-Library for TimesNet.
 - PatchTST or a compact Transformer classifier if time permits.
 
 Do not spend the first experiment cycle on these. First establish whether PDSI beats the controlled InceptionTime baseline and ablations. If it does, run these baselines for reviewer credibility.

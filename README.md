@@ -32,6 +32,16 @@ python scripts\run_experiment.py --config configs\synthetic_baseline_smoke.json
 
 Outputs are written to `runs/<experiment_name>/` as per-seed JSON plus `summary.json`.
 
+## Full Controlled Pipeline
+
+After linking or downloading PTB-XL, CHB-MIT, and Sleep-EDF, run:
+
+```powershell
+bash scripts\run_full_neurips_pipeline.sh
+```
+
+This executes preprocessing, smoke tests, the in-repo neural baselines, PDSI ablations, the small validation sweep, result comparisons, and profiling. External baselines such as MiniRocket, Hydra, TSLANet, and TimesNet still need to be run from their maintained implementations and merged into the final paper table.
+
 ## Real-Data Input Format
 
 For CHB-MIT, PTB-XL, or Sleep-EDF, preprocess signals into an `.npz` file with either:
@@ -59,6 +69,7 @@ Optional converters are included for the two primary benchmarks:
 ```powershell
 python scripts\preprocess_ptbxl.py --root C:\path\to\ptb-xl --out data\ptbxl_superclass.npz --sampling-rate 100
 python scripts\preprocess_chbmit.py --root C:\path\to\chbmit --out data\chbmit_windows.npz
+python scripts\preprocess_sleepedf.py --root C:\path\to\sleep-edf --out data\sleepedf_epochs.npz
 ```
 
 ## Main Ablations
@@ -86,7 +97,11 @@ python scripts\summarize_results.py --primary runs\pdsi\summary.json --baseline 
 - [scripts/run_experiment.py](scripts/run_experiment.py): experiment CLI.
 - [scripts/profile_model.py](scripts/profile_model.py): parameter/FLOP/memory estimator.
 - [scripts/make_experiment_matrix.py](scripts/make_experiment_matrix.py): creates baseline, ablation, and small sweep configs.
+- [scripts/run_aeon_baseline.py](scripts/run_aeon_baseline.py): MiniRocket, MultiRocket, Hydra, and MultiRocket-Hydra baselines.
+- [scripts/setup_official_baselines.sh](scripts/setup_official_baselines.sh): fetches official TimesNet and TSLANet repositories.
 - [scripts/preprocess_ptbxl.py](scripts/preprocess_ptbxl.py): optional PTB-XL converter.
 - [scripts/preprocess_chbmit.py](scripts/preprocess_chbmit.py): optional CHB-MIT converter.
+- [scripts/preprocess_sleepedf.py](scripts/preprocess_sleepedf.py): optional Sleep-EDF converter.
+- [scripts/run_full_neurips_pipeline.sh](scripts/run_full_neurips_pipeline.sh): full controlled experiment pipeline.
 - [BASELINES.md](BASELINES.md): baseline and hyperparameter selection plan.
 - [PROPOSAL.md](PROPOSAL.md): NeurIPS-style project plan and skeptical review.
