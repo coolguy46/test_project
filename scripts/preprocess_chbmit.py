@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import re
+import shutil
 from pathlib import Path
 
 import numpy as np
@@ -118,9 +119,14 @@ def main() -> None:
     parser.add_argument("--window-sec", type=float, default=10.0)
     parser.add_argument("--stride-sec", type=float, default=5.0)
     parser.add_argument("--min-seizure-overlap-sec", type=float, default=1.0)
+    parser.add_argument("--max-negative-per-file", type=int, default=40)
+    parser.add_argument("--keep-all-negatives", action="store_true")
+    parser.add_argument("--chunk-dir", type=Path, default=None)
+    parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--channels", nargs="+", default=DEFAULT_CHANNELS)
     args = parser.parse_args()
     mne = _import_mne()
+    rng = np.random.default_rng(args.seed)
 
     all_intervals: dict[Path, list[tuple[float, float]]] = {}
     for summary in args.root.glob("chb??/chb??-summary.txt"):
@@ -128,10 +134,13 @@ def main() -> None:
         for filename, intervals in parsed.items():
             all_intervals[summary.parent / filename] = intervals
 
-    split_x: dict[str, list[np.ndarray]] = {"train": [], "val": [], "test": []}
-    split_y: dict[str, list[int]] = {"train": [], "val": [], "test": []}
+    chunk_dir = args.chunk_dir or args.out.with_suffix(".chunks")
+    if chunk_dir.exists():
+        shutil.rmtree(chunk_dir)
+    chunk_dir.mkdir(parents=True, exist_ok=True)
+    split_chunks: dict[str, list[Path]] = {"train": [], "val": [], "test": []}
 
-    for edf in sorted(args.root.glob("chb??/*.edf")):
+    for file_idx, edf in enumerate(sorted(args.root.glob("chb??/*.edf"))):
         raw = mne.io.read_raw_edf(edf, preload=True, verbose=False)
         if not _pick_canonical_channels(raw, args.channels):
             continue
@@ -142,18 +151,52 @@ def main() -> None:
         stride = int(round(args.stride_sec * sfreq))
         seizures = all_intervals.get(edf, [])
         split = _split_name(_subject_id(edf))
+        xs_pos: list[np.ndarray] = []
+        xs_neg: list[np.ndarray] = []
         for start in range(0, max(data.shape[1] - win + 1, 0), stride):
             end = start + win
             start_sec = start / sfreq
             end_sec = end / sfreq
-            split_x[split].append(data[:, start:end])
-            split_y[split].append(_window_label(start_sec, end_sec, seizures, args.min_seizure_overlap_sec))
+            label = _window_label(start_sec, end_sec, seizures, args.min_seizure_overlap_sec)
+            if label:
+                xs_pos.append(data[:, start:end].copy())
+            else:
+                xs_neg.append(data[:, start:end].copy())
+
+        if not args.keep_all_negatives and len(xs_neg) > args.max_negative_per_file:
+            keep = rng.choice(len(xs_neg), size=args.max_negative_per_file, replace=False)
+            xs_neg = [xs_neg[int(i)] for i in keep]
+
+        if not xs_pos and not xs_neg:
+            continue
+        x_file = np.stack(xs_pos + xs_neg, axis=0).astype(np.float32, copy=False)
+        y_file = np.array([1] * len(xs_pos) + [0] * len(xs_neg), dtype=np.int64)
+        order = rng.permutation(len(y_file))
+        x_file = x_file[order]
+        y_file = y_file[order]
+        chunk_path = chunk_dir / f"{split}_{file_idx:04d}_{edf.stem}.npz"
+        np.savez_compressed(chunk_path, x=x_file, y=y_file)
+        split_chunks[split].append(chunk_path)
+        print(
+            f"{edf.name}: split={split} windows={len(y_file)} positives={int(y_file.sum())} "
+            f"negatives={int((y_file == 0).sum())}",
+            flush=True,
+        )
+        del raw, data, x_file, y_file, xs_pos, xs_neg
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     payload = {}
     for split in ["train", "val", "test"]:
-        payload[f"x_{split}"] = np.stack(split_x[split], axis=0)
-        payload[f"y_{split}"] = np.array(split_y[split], dtype=np.int64)
+        xs = []
+        ys = []
+        for chunk in split_chunks[split]:
+            loaded = np.load(chunk)
+            xs.append(loaded["x"])
+            ys.append(loaded["y"])
+        if not xs:
+            raise SystemExit(f"No CHB-MIT windows found for split {split}.")
+        payload[f"x_{split}"] = np.concatenate(xs, axis=0)
+        payload[f"y_{split}"] = np.concatenate(ys, axis=0)
     payload["channels"] = np.array(args.channels)
     payload["target_hz"] = args.target_hz
     np.savez_compressed(args.out, **payload)
