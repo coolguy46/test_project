@@ -17,7 +17,7 @@ sys.path.insert(0, str(ROOT / "src"))
 try:
     import torch
 except ModuleNotFoundError as exc:
-    raise SystemExit("PyTorch is required because this script reuses PDSI metrics.") from exc
+    raise SystemExit("PyTorch is required because this script reuses the repo metric utilities.") from exc
 
 from pdsi.data.arrays import load_npz_splits
 from pdsi.training.metrics import classification_metrics
@@ -141,7 +141,7 @@ def _summary(records: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run aeon MiniRocket/MultiRocket/Hydra baselines on PDSI NPZ files.")
+    parser = argparse.ArgumentParser(description="Run aeon MiniRocket/MultiRocket/Hydra baselines on SETM NPZ files.")
     parser.add_argument("--dataset", type=Path, required=True)
     parser.add_argument("--method", required=True, choices=["minirocket", "multirocket", "hydra", "multirocket_hydra"])
     parser.add_argument("--experiment-name", default="")

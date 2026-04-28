@@ -1,10 +1,6 @@
-from .gates import AdaptiveSpectralGate, ComplexSpectralGate, FixedButterworthGate, IdentityGate
-from .inception import PDSIClassifier
+from .setm import ModelConfig, SETMClassifier
 
 __all__ = [
-    "AdaptiveSpectralGate",
-    "ComplexSpectralGate",
-    "FixedButterworthGate",
-    "IdentityGate",
-    "PDSIClassifier",
+    "ModelConfig",
+    "SETMClassifier",
 ]

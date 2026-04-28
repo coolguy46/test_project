@@ -34,7 +34,7 @@ Fetched repositories:
 - `TSLANet`: official ICML 2024 TSLANet implementation.
 
 Use these repos for final-paper external deep baselines. Keep them out of the
-PDSI package and record exact commit hashes in the paper appendix.
+SETM package and record exact commit hashes in the paper appendix.
 EOF
 
 git -C Time-Series-Library rev-parse HEAD > Time-Series-Library.COMMIT

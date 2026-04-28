@@ -1,0 +1,49 @@
+{
+  "experiment_name": "synthetic_setm_smoke",
+  "seeds": [0],
+  "profile_batch_size": 16,
+  "data": {
+    "num_channels": 3,
+    "seq_len": 256
+  },
+  "dataset": {
+    "name": "synthetic",
+    "params": {
+      "n_train": 256,
+      "n_val": 96,
+      "n_test": 96,
+      "num_channels": 3,
+      "seq_len": 256,
+      "num_classes": 4,
+      "noise_std": 0.35
+    }
+  },
+  "model": {
+    "num_channels": 3,
+    "num_classes": 4,
+    "hidden_channels": 64,
+    "depth": 3,
+    "dropout": 0.1,
+    "num_bands": 12,
+    "num_prototypes": 6,
+    "router_mode": "prototype",
+    "expert_kernel_size": 7,
+    "expert_dilations": [1, 2, 4],
+    "gain_limit": 0.5,
+    "multilabel": false
+  },
+  "train": {
+    "epochs": 3,
+    "batch_size": 64,
+    "lr": 0.001,
+    "weight_decay": 0.0001,
+    "patience": 3,
+    "num_workers": 0,
+    "amp": true,
+    "amp_dtype": "bfloat16",
+    "lambda_balance": 0.0001,
+    "lambda_temporal_smooth": 0.0001,
+    "grad_clip_norm": 1.0,
+    "progress": true
+  }
+}

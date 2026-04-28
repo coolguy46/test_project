@@ -28,8 +28,8 @@ def main() -> None:
                 "run": summary.parent.name,
                 "mean_best_val_macro_f1": sum(best_vals) / len(best_vals),
                 "num_bands": cfg["model"].get("num_bands"),
-                "max_delta": cfg["model"].get("max_delta"),
-                "lambda_tv": cfg["train"].get("lambda_tv"),
+                "num_prototypes": cfg["model"].get("num_prototypes"),
+                "lambda_temporal_smooth": cfg["train"].get("lambda_temporal_smooth"),
                 "config": str(cfg_path),
             }
         )

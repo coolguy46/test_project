@@ -21,7 +21,7 @@ except ModuleNotFoundError as exc:
 from pdsi.data.arrays import load_npz_splits
 from pdsi.data.synthetic import SyntheticConfig, make_synthetic_splits
 from pdsi.models.complexity import count_parameters, estimate_forward_flops
-from pdsi.models.inception import ModelConfig, PDSIClassifier
+from pdsi.models.setm import ModelConfig, SETMClassifier
 from pdsi.training.trainer import TrainConfig, train_model
 
 
@@ -74,7 +74,7 @@ def main() -> None:
 
     device = torch.device("cuda" if args.device == "auto" and torch.cuda.is_available() else args.device)
     model_cfg = ModelConfig(**cfg["model"])
-    model = PDSIClassifier(model_cfg).to(device)
+    model = SETMClassifier(model_cfg).to(device)
     profile = estimate_forward_flops(
         model,
         seq_len=cfg["data"]["seq_len"],
@@ -91,7 +91,7 @@ def main() -> None:
     for seed in cfg.get("seeds", [0]):
         datasets = _build_datasets(cfg, seed)
         train_cfg = TrainConfig(**{**cfg["train"], "seed": seed, "multilabel": model_cfg.multilabel})
-        model = PDSIClassifier(model_cfg)
+        model = SETMClassifier(model_cfg)
         record = train_model(model, datasets, train_cfg, device)
         record["params"] = count_parameters(model)
         records.append(record)

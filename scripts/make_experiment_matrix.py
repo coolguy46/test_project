@@ -24,8 +24,8 @@ def emit(cfg: dict[str, Any], out_dir: Path, name: str, commands: list[str]) -> 
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Generate PDSI baseline, ablation, and small sweep configs.")
-    parser.add_argument("--template", type=Path, default=Path("configs/npz_pdsi_template.json"))
+    parser = argparse.ArgumentParser(description="Generate SETM baseline, ablation, and small sweep configs.")
+    parser.add_argument("--template", type=Path, default=Path("configs/npz_setm_template.json"))
     parser.add_argument("--out-dir", type=Path, default=Path("configs/generated"))
     parser.add_argument("--prefix", default="ptbxl")
     parser.add_argument("--dataset-path", default="")
@@ -41,41 +41,26 @@ def main() -> None:
 
     commands: list[str] = []
 
-    # Main neural baselines and closest controlled variants.
-    for backbone, gate in [
-        ("inception", "none"),
-        ("inception", "pdsi"),
-        ("inception", "complex"),
-        ("inception", "butterworth"),
-        ("fcn", "none"),
-        ("resnet", "none"),
-        ("tslanet_lite", "none"),
-        ("timesnet_lite", "none"),
-        ("fcn", "pdsi"),
-        ("resnet", "pdsi"),
-        ("tslanet_lite", "pdsi"),
-        ("timesnet_lite", "pdsi"),
-    ]:
+    # Main model and nearest causal ablations.
+    for router_mode in ["uniform", "static", "direct", "prototype"]:
         cfg = copy.deepcopy(base)
-        cfg["model"]["backbone"] = backbone
-        cfg["model"]["gate"] = gate
-        emit(cfg, args.out_dir, f"{args.prefix}_{backbone}_{gate}", commands)
+        cfg["model"]["router_mode"] = router_mode
+        emit(cfg, args.out_dir, f"{args.prefix}_setm_{router_mode}", commands)
 
-    # Small, defensible PDSI hyperparameter sweep. Run on validation only for selection;
+    # Small, defensible SETM hyperparameter sweep. Run on validation only for selection;
     # report final test once with the selected setting and five fixed seeds.
     if args.include_sweep:
         for num_bands in [8, 16, 32]:
-            for max_delta in [0.25, 0.5, 0.75]:
-                for lambda_tv in [0.0, 1e-4]:
+            for num_prototypes in [4, 8, 12]:
+                for lambda_temporal_smooth in [0.0, 1e-4]:
                     cfg = copy.deepcopy(base)
                     cfg["experiment_name"] = ""
-                    cfg["model"]["backbone"] = "inception"
-                    cfg["model"]["gate"] = "pdsi"
+                    cfg["model"]["router_mode"] = "prototype"
                     cfg["model"]["num_bands"] = num_bands
-                    cfg["model"]["max_delta"] = max_delta
-                    cfg["train"]["lambda_tv"] = lambda_tv
+                    cfg["model"]["num_prototypes"] = num_prototypes
+                    cfg["train"]["lambda_temporal_smooth"] = lambda_temporal_smooth
                     cfg["seeds"] = [base["seeds"][0]]
-                    name = f"{args.prefix}_sweep_b{num_bands}_d{str(max_delta).replace('.', 'p')}_tv{lambda_tv:g}"
+                    name = f"{args.prefix}_sweep_b{num_bands}_p{num_prototypes}_ts{lambda_temporal_smooth:g}"
                     emit(cfg, args.out_dir / "sweep", name, commands)
 
     script_path = args.out_dir / f"run_{args.prefix}_matrix.sh"

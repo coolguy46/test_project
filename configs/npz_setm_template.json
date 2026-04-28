@@ -1,0 +1,43 @@
+{
+  "experiment_name": "npz_setm_main",
+  "seeds": [0, 1, 2, 3, 4],
+  "profile_batch_size": 128,
+  "data": {
+    "num_channels": 12,
+    "seq_len": 1000
+  },
+  "dataset": {
+    "name": "npz",
+    "path": "data/ptbxl_superclass.npz",
+    "channels_last": false,
+    "low_label_fraction": 1.0
+  },
+  "model": {
+    "num_channels": 12,
+    "num_classes": 5,
+    "hidden_channels": 96,
+    "depth": 4,
+    "dropout": 0.1,
+    "num_bands": 16,
+    "num_prototypes": 8,
+    "router_mode": "prototype",
+    "expert_kernel_size": 7,
+    "expert_dilations": [1, 2, 4, 8],
+    "gain_limit": 0.5,
+    "multilabel": true
+  },
+  "train": {
+    "epochs": 20,
+    "batch_size": 256,
+    "lr": 0.001,
+    "weight_decay": 0.0001,
+    "patience": 6,
+    "num_workers": 4,
+    "amp": true,
+    "amp_dtype": "bfloat16",
+    "lambda_balance": 0.0001,
+    "lambda_temporal_smooth": 0.0001,
+    "grad_clip_norm": 1.0,
+    "progress": true
+  }
+}

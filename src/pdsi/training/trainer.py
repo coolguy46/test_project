@@ -24,8 +24,8 @@ class TrainConfig:
     num_workers: int = 0
     amp: bool = True
     amp_dtype: str = "bfloat16"
-    lambda_identity: float = 1e-4
-    lambda_tv: float = 1e-4
+    lambda_balance: float = 1e-4
+    lambda_temporal_smooth: float = 1e-4
     grad_clip_norm: float = 1.0
     seed: int = 0
     multilabel: bool = False
@@ -135,7 +135,7 @@ def train_model(
                 logits = model(x)
                 loss = criterion(logits, y.float() if cfg.multilabel else y.long())
                 if hasattr(model, "regularization_loss"):
-                    loss = loss + model.regularization_loss(cfg.lambda_identity, cfg.lambda_tv)
+                    loss = loss + model.regularization_loss(cfg.lambda_balance, cfg.lambda_temporal_smooth)
             scaler.scale(loss).backward()
             if cfg.grad_clip_norm:
                 scaler.unscale_(optimizer)

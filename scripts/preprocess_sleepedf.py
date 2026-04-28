@@ -43,7 +43,7 @@ def _split_name(subject: int) -> str:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Convert Sleep-EDF Expanded into PDSI NPZ format.")
+    parser = argparse.ArgumentParser(description="Convert Sleep-EDF Expanded into SETM NPZ format.")
     parser.add_argument("--root", type=Path, required=True, help="Sleep-EDF root containing PSG and Hypnogram EDF files.")
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--channel", default="EEG Fpz-Cz")

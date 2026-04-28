@@ -51,10 +51,10 @@ def estimate_forward_flops(model: nn.Module, seq_len: int, num_channels: int, ba
     for hook in hooks:
         hook.remove()
 
-    gate_name = model.gate.__class__.__name__ if hasattr(model, "gate") else ""
     fft_flops = 0
-    if gate_name not in {"IdentityGate", ""}:
-        fft_flops = int(10 * batch_size * num_channels * seq_len * math.log2(max(seq_len, 2)))
+    if getattr(model, "uses_fft", False):
+        fft_passes = int(getattr(model, "fft_passes", 1))
+        fft_flops = int(10 * fft_passes * batch_size * num_channels * seq_len * math.log2(max(seq_len, 2)))
     return {
         "params": count_parameters(model),
         "conv_flops": int(conv_flops),

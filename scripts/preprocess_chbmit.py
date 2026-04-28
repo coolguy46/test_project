@@ -112,7 +112,7 @@ def _window_label(start_sec: float, end_sec: float, seizures: list[tuple[float, 
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Convert CHB-MIT EDF files into the PDSI NPZ format.")
+    parser = argparse.ArgumentParser(description="Convert CHB-MIT EDF files into the SETM NPZ format.")
     parser.add_argument("--root", type=Path, required=True, help="CHB-MIT root containing chb?? folders.")
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--target-hz", type=float, default=256.0)

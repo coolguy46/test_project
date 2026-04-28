@@ -33,7 +33,7 @@ def _labels(metadata, scp_statements, classes: list[str]) -> np.ndarray:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Convert PTB-XL into the PDSI NPZ format.")
+    parser = argparse.ArgumentParser(description="Convert PTB-XL into the SETM NPZ format.")
     parser.add_argument("--root", type=Path, required=True, help="PTB-XL root containing ptbxl_database.csv.")
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--sampling-rate", type=int, choices=[100, 500], default=100)

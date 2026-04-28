@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# End-to-end controlled PDSI experiment pipeline.
-# External baselines such as Hydra, MiniRocket, TSLANet, and TimesNet must still
-# be run from their own repositories and merged into the final table.
+# End-to-end controlled SETM experiment pipeline.
+# External baselines such as Hydra, MiniRocket, and strong upstream neural models
+# still need to be run from their maintained repositories and merged later.
 
 PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 cd "${PROJECT_ROOT}"
@@ -32,13 +32,13 @@ if [[ ! -d "${PTBXL_ROOT}" || ! -d "${CHBMIT_ROOT}" || ! -d "${SLEEPEDF_ROOT}" ]
 fi
 
 echo "Running synthetic smoke tests"
-python scripts/run_experiment.py --config configs/synthetic_baseline_smoke.json
-python scripts/run_experiment.py --config configs/synthetic_pdsi_smoke.json
+python scripts/run_experiment.py --config configs/synthetic_uniform_smoke.json
+python scripts/run_experiment.py --config configs/synthetic_setm_smoke.json
 mkdir -p runs
 python scripts/summarize_results.py \
-  --primary runs/synthetic_pdsi_smoke/summary.json \
-  --baseline runs/synthetic_baseline_smoke/summary.json \
-  > runs/synthetic_pdsi_vs_baseline.json
+  --primary runs/synthetic_setm_smoke/summary.json \
+  --baseline runs/synthetic_uniform_smoke/summary.json \
+  > runs/synthetic_setm_vs_uniform.json
 
 echo "Preprocessing PTB-XL"
 if [[ ! -f "${PTBXL_NPZ}" ]]; then
@@ -63,7 +63,7 @@ fi
 
 echo "Generating and running PTB-XL matrix"
 python scripts/make_experiment_matrix.py \
-  --template configs/npz_pdsi_template.json \
+  --template configs/npz_setm_template.json \
   --out-dir configs/generated/ptbxl \
   --prefix ptbxl \
   --dataset-path "${PTBXL_NPZ}" \
@@ -76,8 +76,8 @@ echo "Creating CHB-MIT template"
 python - <<'PY'
 import json
 p = "configs/chbmit_template.json"
-cfg = json.load(open("configs/npz_pdsi_template.json"))
-cfg["experiment_name"] = "chbmit_inception_pdsi"
+cfg = json.load(open("configs/npz_setm_template.json"))
+cfg["experiment_name"] = "chbmit_setm_prototype"
 cfg["data"]["num_channels"] = 18
 cfg["data"]["seq_len"] = 2560
 cfg["dataset"]["path"] = "data/chbmit_windows.npz"
@@ -141,18 +141,16 @@ compare() {
 }
 
 echo "Writing comparison summaries"
-compare ptbxl_pdsi_vs_inception ptbxl_inception_pdsi ptbxl_inception_none
-compare ptbxl_pdsi_vs_complex ptbxl_inception_pdsi ptbxl_inception_complex
-compare ptbxl_pdsi_vs_butterworth ptbxl_inception_pdsi ptbxl_inception_butterworth
-compare ptbxl_fcn_pdsi_vs_fcn ptbxl_fcn_pdsi ptbxl_fcn_none
-compare ptbxl_resnet_pdsi_vs_resnet ptbxl_resnet_pdsi ptbxl_resnet_none
-compare chbmit_pdsi_vs_inception chbmit_inception_pdsi chbmit_inception_none
-# compare sleepedf_pdsi_vs_inception sleepedf_inception_pdsi sleepedf_inception_none
+compare ptbxl_prototype_vs_uniform ptbxl_setm_prototype ptbxl_setm_uniform
+compare ptbxl_prototype_vs_static ptbxl_setm_prototype ptbxl_setm_static
+compare ptbxl_prototype_vs_direct ptbxl_setm_prototype ptbxl_setm_direct
+compare chbmit_prototype_vs_uniform chbmit_setm_prototype chbmit_setm_uniform
+# compare sleepedf_prototype_vs_uniform sleepedf_setm_prototype sleepedf_setm_uniform
 
 echo "Profiling model variants"
-python scripts/profile_model.py --num-channels 12 --num-classes 5 --seq-len 1000 --gate none --batch-size 256 > runs/profile_ptbxl_none.json
-python scripts/profile_model.py --num-channels 12 --num-classes 5 --seq-len 1000 --gate pdsi --batch-size 256 > runs/profile_ptbxl_pdsi.json
-python scripts/profile_model.py --num-channels 12 --num-classes 5 --seq-len 1000 --gate complex --batch-size 256 > runs/profile_ptbxl_complex.json
+python scripts/profile_model.py --num-channels 12 --num-classes 5 --seq-len 1000 --router-mode uniform --batch-size 256 > runs/profile_ptbxl_uniform.json
+python scripts/profile_model.py --num-channels 12 --num-classes 5 --seq-len 1000 --router-mode prototype --batch-size 256 > runs/profile_ptbxl_prototype.json
+python scripts/profile_model.py --num-channels 12 --num-classes 5 --seq-len 1000 --router-mode direct --batch-size 256 > runs/profile_ptbxl_direct.json
 
 if python - <<'PY'
 import importlib.util

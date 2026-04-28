@@ -1,8 +1,12 @@
-# Phase-Decoupled Spectral Inception
+# Spectral Episode Temporal Mixer
 
-This repository contains a compact research scaffold for **PDSI**, a phase-preserving spectral gate placed before an InceptionTime-style classifier for biomedical time-series tasks.
+This repository contains a compact research scaffold for **SETM**, a fast biomedical time-series classifier that combines:
 
-The code is designed for fast ablations on a single AMD MI300X-class accelerator. The included synthetic benchmark is only a smoke test; the paper plan in [PROPOSAL.md](PROPOSAL.md) specifies the intended CHB-MIT, PTB-XL, and optional Sleep-EDF experiments.
+- a tiny FFT-based **spectral summary**,
+- a learned library of **spectral prototypes**,
+- and a stack of **routed temporal mixer blocks** with sample-adaptive expert selection.
+
+The core idea is intentionally narrow. SETM does **not** filter the input waveform and does **not** rely on an Inception-style backbone. Instead, it uses coarse spectral context to decide which temporal receptive fields to emphasize for each sample. The intended paper claim is modest: spectral prototype routing can improve the quality/efficiency tradeoff of a lightweight temporal mixer under matched training budgets.
 
 ## Setup
 
@@ -26,21 +30,21 @@ pip install matplotlib pandas mne wfdb
 ## Quick Smoke Run
 
 ```powershell
-python scripts\run_experiment.py --config configs\synthetic_pdsi_smoke.json
-python scripts\run_experiment.py --config configs\synthetic_baseline_smoke.json
+python scripts\run_experiment.py --config configs\synthetic_uniform_smoke.json
+python scripts\run_experiment.py --config configs\synthetic_setm_smoke.json
 ```
 
 Outputs are written to `runs/<experiment_name>/` as per-seed JSON plus `summary.json`.
 
 ## Full Controlled Pipeline
 
-After linking or downloading PTB-XL, CHB-MIT, and Sleep-EDF, run:
+After linking or downloading PTB-XL, CHB-MIT, and optional Sleep-EDF, run:
 
 ```powershell
 bash scripts\run_full_neurips_pipeline.sh
 ```
 
-This executes preprocessing, smoke tests, the in-repo neural baselines, PDSI ablations, the small validation sweep, result comparisons, and profiling. External baselines such as MiniRocket, Hydra, TSLANet, and TimesNet still need to be run from their maintained implementations and merged into the final paper table.
+This executes preprocessing, smoke tests, SETM router ablations, a small validation sweep, result comparisons, and profiling. Strong external baselines such as MiniRocket, Hydra, and upstream neural models should still be run from their maintained implementations and merged into the final paper table.
 
 ## Real-Data Input Format
 
@@ -58,13 +62,13 @@ x, y, split
 
 where `x` has shape `(N, C, T)` by default, `y` is class indices `(N,)` for multiclass or binary matrix `(N, K)` for multilabel, and `split` contains `train`, `val`, or `test` strings.
 
-Then copy `configs/npz_pdsi_template.json`, set `dataset.path`, `data.num_channels`, `data.seq_len`, and `model.num_classes`, and run:
+Then copy `configs/npz_setm_template.json`, set `dataset.path`, `data.num_channels`, `data.seq_len`, and `model.num_classes`, and run:
 
 ```powershell
-python scripts\run_experiment.py --config configs\npz_pdsi_template.json
+python scripts\run_experiment.py --config configs\npz_setm_template.json
 ```
 
-Optional converters are included for the two primary benchmarks:
+Optional converters are included for the main benchmarks:
 
 ```powershell
 python scripts\preprocess_ptbxl.py --root C:\path\to\ptb-xl --out data\ptbxl_superclass.npz --sampling-rate 100
@@ -74,34 +78,32 @@ python scripts\preprocess_sleepedf.py --root C:\path\to\sleep-edf --out data\sle
 
 ## Main Ablations
 
-Set `model.gate` in a config to:
+Set `model.router_mode` in a config to:
 
-- `none`: InceptionTime baseline.
-- `pdsi`: bounded phase-preserving adaptive spectral gate.
-- `complex`: complex spectral multiplier that can alter phase.
-- `butterworth`: fixed DSP-style spectral bandpass control.
+- `uniform`: average temporal experts uniformly; no sample adaptation.
+- `static`: one learned route schedule shared by the whole dataset.
+- `direct`: direct MLP routing from spectral summary, no prototype library.
+- `prototype`: full SETM with learned spectral prototypes and routed expert schedule.
 
 Aggregate significance across matched seeds:
 
 ```powershell
-python scripts\summarize_results.py --primary runs\pdsi\summary.json --baseline runs\baseline\summary.json
+python scripts\summarize_results.py --primary runs\ptbxl_setm_prototype\summary.json --baseline runs\ptbxl_setm_uniform\summary.json
 ```
 
 ## Code Map
 
-- [src/pdsi/models/gates.py](src/pdsi/models/gates.py): spectral gate variants.
-- [src/pdsi/models/inception.py](src/pdsi/models/inception.py): InceptionTime-style classifier.
-- [src/pdsi/data/synthetic.py](src/pdsi/data/synthetic.py): synthetic oscillatory benchmark.
-- [src/pdsi/data/arrays.py](src/pdsi/data/arrays.py): generic `.npz` loader.
-- [src/pdsi/training/trainer.py](src/pdsi/training/trainer.py): training/evaluation loop.
-- [scripts/run_experiment.py](scripts/run_experiment.py): experiment CLI.
-- [scripts/profile_model.py](scripts/profile_model.py): parameter/FLOP/memory estimator.
-- [scripts/make_experiment_matrix.py](scripts/make_experiment_matrix.py): creates baseline, ablation, and small sweep configs.
-- [scripts/run_aeon_baseline.py](scripts/run_aeon_baseline.py): MiniRocket, MultiRocket, Hydra, and MultiRocket-Hydra baselines.
-- [scripts/setup_official_baselines.sh](scripts/setup_official_baselines.sh): fetches official TimesNet and TSLANet repositories.
-- [scripts/preprocess_ptbxl.py](scripts/preprocess_ptbxl.py): optional PTB-XL converter.
-- [scripts/preprocess_chbmit.py](scripts/preprocess_chbmit.py): optional CHB-MIT converter.
-- [scripts/preprocess_sleepedf.py](scripts/preprocess_sleepedf.py): optional Sleep-EDF converter.
-- [scripts/run_full_neurips_pipeline.sh](scripts/run_full_neurips_pipeline.sh): full controlled experiment pipeline.
-- [BASELINES.md](BASELINES.md): baseline and hyperparameter selection plan.
-- [PROPOSAL.md](PROPOSAL.md): NeurIPS-style project plan and skeptical review.
+- [src/pdsi/models/setm.py](C:/Users/ankey/True_Project/src/pdsi/models/setm.py): SETM model, spectral router, and routed temporal mixer blocks.
+- [src/pdsi/data/synthetic.py](C:/Users/ankey/True_Project/src/pdsi/data/synthetic.py): synthetic oscillatory benchmark.
+- [src/pdsi/data/arrays.py](C:/Users/ankey/True_Project/src/pdsi/data/arrays.py): generic `.npz` loader.
+- [src/pdsi/training/trainer.py](C:/Users/ankey/True_Project/src/pdsi/training/trainer.py): training/evaluation loop.
+- [scripts/run_experiment.py](C:/Users/ankey/True_Project/scripts/run_experiment.py): experiment CLI.
+- [scripts/profile_model.py](C:/Users/ankey/True_Project/scripts/profile_model.py): parameter/FLOP estimator.
+- [scripts/make_experiment_matrix.py](C:/Users/ankey/True_Project/scripts/make_experiment_matrix.py): creates router ablation and sweep configs.
+- [scripts/run_aeon_baseline.py](C:/Users/ankey/True_Project/scripts/run_aeon_baseline.py): MiniRocket, MultiRocket, Hydra, and MultiRocket-Hydra baselines.
+- [scripts/preprocess_ptbxl.py](C:/Users/ankey/True_Project/scripts/preprocess_ptbxl.py): optional PTB-XL converter.
+- [scripts/preprocess_chbmit.py](C:/Users/ankey/True_Project/scripts/preprocess_chbmit.py): optional CHB-MIT converter.
+- [scripts/preprocess_sleepedf.py](C:/Users/ankey/True_Project/scripts/preprocess_sleepedf.py): optional Sleep-EDF converter.
+- [scripts/run_full_neurips_pipeline.sh](C:/Users/ankey/True_Project/scripts/run_full_neurips_pipeline.sh): full controlled experiment pipeline.
+- [BASELINES.md](C:/Users/ankey/True_Project/BASELINES.md): baseline and ablation plan.
+- [PROPOSAL.md](C:/Users/ankey/True_Project/PROPOSAL.md): paper framing and contribution boundaries.
