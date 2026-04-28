@@ -111,7 +111,7 @@ bash configs/generated/chbmit/run_chbmit_matrix.sh
 # cfg["model"]["num_channels"] = 1
 # cfg["model"]["num_classes"] = 5
 # cfg["model"]["multilabel"] = False
-# cfg["train"]["batch_size"] = 2048
+# cfg["train"]["batch_size"] = 128
 # json.dump(cfg, open(p, "w"), indent=2)
 # PY
 
