@@ -26,7 +26,9 @@ def _import_mne():
 
 
 def _subject_id(path: Path) -> int:
-    match = re.search(r"SC(\d{2})", path.name)
+    # Sleep-cassette files look like SC4xxyy..., where `xx` is the subject id
+    # and `yy` is the recording/night identifier.
+    match = re.search(r"SC4(\d{2})\d", path.name)
     if not match:
         return abs(hash(path.name)) % 1000
     return int(match.group(1))
@@ -55,7 +57,9 @@ def main() -> None:
     split_y: dict[str, list[int]] = {"train": [], "val": [], "test": []}
 
     for psg in psg_files:
-        hyp_matches = sorted(psg.parent.glob(psg.name.replace("PSG.edf", "Hypnogram.edf")))
+        # Hypnogram suffixes differ from PSG suffixes (for example E0 vs EC),
+        # so pair on the shared record prefix instead of an exact replacement.
+        hyp_matches = sorted(psg.parent.glob(f"{psg.stem[:6]}*-Hypnogram.edf"))
         if not hyp_matches:
             continue
         hyp = hyp_matches[0]
