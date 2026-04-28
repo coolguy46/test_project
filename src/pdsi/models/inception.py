@@ -11,6 +11,10 @@ from torch import nn
 from .gates import build_gate
 
 
+def _rfft_fp32(x: torch.Tensor) -> torch.Tensor:
+    return torch.fft.rfft(x.float(), dim=-1, norm="ortho")
+
+
 def _odd_kernel(k: int) -> int:
     return k if k % 2 == 1 else k + 1
 
@@ -214,10 +218,10 @@ class TSLANetLiteBlock(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        spectrum = torch.fft.rfft(x, dim=-1, norm="ortho")
+        spectrum = _rfft_fp32(x)
         magnitude = spectrum.abs()
         shrink = torch.relu(magnitude - torch.relu(self.threshold)) / magnitude.clamp_min(1e-6)
-        spectral = torch.fft.irfft(spectrum * shrink.to(spectrum.dtype), n=x.shape[-1], dim=-1, norm="ortho")
+        spectral = torch.fft.irfft(spectrum * shrink.to(spectrum.dtype), n=x.shape[-1], dim=-1, norm="ortho").to(dtype=x.dtype)
         conv = self.pointwise(F.gelu(self.depthwise(x)))
         z = self.mix(spectral) * torch.sigmoid(conv)
         return self.norm(x + self.dropout(z))
